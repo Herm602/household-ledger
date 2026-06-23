@@ -227,6 +227,23 @@
   .card .val{font-size:32px}
   .tabbar{width:calc(min(448px,100vw) - 32px);max-width:416px;justify-content:space-between}
   .tabbar button{flex:1;padding:9px 6px}
+
+  /* ===== desktop: widen + multi-column (phones keep the phone frame). Last in source so it wins. ===== */
+  @media(min-width:900px){
+    .wrap{max-width:1060px;padding:0 28px 64px}
+    header{margin:0 -28px 20px;padding:16px 28px}
+    .hctl{width:auto}
+    #importBtn{flex:none}
+    .cards{grid-template-columns:repeat(4,1fr);gap:16px}
+    .grid2{grid-template-columns:360px 1fr;gap:20px}
+    .grid2b{grid-template-columns:1fr 360px;gap:20px}
+    #debts{grid-template-columns:repeat(3,1fr) !important;gap:16px}
+    .hero,.heroIn{min-height:300px}
+    .heroArt{width:208px;height:238px;top:26px;right:22px}
+    .card .val{font-size:34px}
+    .tabbar{max-width:540px}
+    .catscroll{max-height:520px}
+  }
   @media(max-width:520px){ .heroIn .hv{font-size:46px} .hero,.heroIn{min-height:300px} .heroArt{width:106px;height:122px;top:12px} .tabbar{width:calc(100% - 24px);justify-content:space-between} .tabbar button{padding:8px 6px;flex:1} }
   /* screen transitions + motion */
   @keyframes screenIn{from{opacity:0;transform:translateY(16px) scale(.99)}to{opacity:1;transform:none}}
