@@ -776,8 +776,8 @@ function __startLedger(){
       toast('Imported <b>'+r.count+'</b> transactions for <b>'+view.toLocaleString('en-ZA',{month:'long'})+' '+p[0]+'</b>'+(r.salary>0?' · salary '+fmt(r.salary):'')+'. ✓');
     }catch(e){ toast('Import failed: '+(e.message||e)); }
   }
-  document.getElementById('importBtn').onclick=function(){ document.getElementById('importFile').click(); };
-  document.getElementById('importFile').onchange=function(e){ var f=e.target.files[0]; if(f) handleImport(f); e.target.value=''; };
+  var _ib=document.getElementById('importBtn'); if(_ib) _ib.onclick=function(){ document.getElementById('importFile').click(); };
+  var _if=document.getElementById('importFile'); if(_if) _if.onchange=function(e){ var f=e.target.files[0]; if(f) handleImport(f); e.target.value=''; };
 
   // ---- multi-screen app navigation ----
   var tabbar=document.getElementById('tabbar');
