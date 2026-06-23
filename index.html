@@ -377,6 +377,11 @@
       <label class="fl">Liesl — monthly</label>
       <input class="num" id="mPartner" type="number" step="100" min="0" placeholder="0" />
     </div>
+    <div class="frow">
+      <label class="fl">Other money in (this month)</label>
+      <input class="num" id="mExtra" type="number" step="100" min="0" placeholder="0" />
+      <div style="font-size:11px;color:var(--muted);margin-top:5px">Transfers in, bonuses, refunds — just for this month.</div>
+    </div>
     <div class="ftot"><span class="lab" style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)">Household total</span><b class="num" id="mTotal">R0</b></div>
     <div class="mbtns">
       <button class="btn ghost" id="mCancel" type="button">Cancel</button>
@@ -428,7 +433,7 @@ function __startLedger(){
   var CARD_BAL = 0, CARD_RATE = 0, CARD_PMT = 0; // Nedbank 21% card
   var monthKey = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
   var now = new Date();
-  var view = new Date(2026, 4, 1); // default to May 2026 (recent, representative month)
+  var view = new Date(now.getFullYear(), now.getMonth(), 1); // default to current month
 
   function seed(){
     var tx = [], i = 0;
@@ -455,7 +460,8 @@ function __startLedger(){
 
   var fmt = function(n){ return 'R' + Math.round(n).toLocaleString('en-ZA'); };
   function youFor(mk){ return (state.you && state.you[mk] != null) ? state.you[mk] : state.youDefault; }
-  function incomeFor(mk){ return youFor(mk) + (state.partner||0); }
+  function extraFor(mk){ return (state.extra && state.extra[mk] != null) ? state.extra[mk] : 0; }
+  function incomeFor(mk){ return youFor(mk) + (state.partner||0) + extraFor(mk); }
   function budgetFor(c){ return (state.budgets && state.budgets[c.name] != null) ? state.budgets[c.name] : c.budget; }
 
   var sel = document.getElementById('fCat');
@@ -486,7 +492,8 @@ function __startLedger(){
     var rate = income>0 ? Math.round((remain/income)*100) : 0;
 
     document.getElementById('cIncome').textContent = fmt(income);
-    document.getElementById('cIncomeSub').innerHTML = 'Hermann '+fmt(youFor(mk))+' · Liesl '+fmt(state.partner||0);
+    var _x=extraFor(mk);
+    document.getElementById('cIncomeSub').innerHTML = 'Hermann '+fmt(youFor(mk))+' · Liesl '+fmt(state.partner||0)+(_x>0?' · +'+fmt(_x)+' in':'');
     document.getElementById('cSpent').textContent = fmt(spent);
     var rEl = document.getElementById('cRemain'); rEl.textContent = fmt(remain);
     rEl.style.color = remain<0 ? 'var(--danger)' : 'var(--ink)';
@@ -535,7 +542,8 @@ function __startLedger(){
     var hd=document.getElementById('heroDelta');
     hd.textContent=(remain<0?'▼ ':'▲ ')+fmt(Math.abs(remain))+(remain<0?' over':' left');
     hd.style.color=remain<0?'#FFD2CE':'#DDEBFF';
-    document.getElementById('heroSub').textContent='Hermann '+fmt(youFor(mk))+' · Liesl '+fmt(state.partner||0);
+    var hx=extraFor(mk);
+    document.getElementById('heroSub').textContent='Hermann '+fmt(youFor(mk))+' · Liesl '+fmt(state.partner||0)+(hx>0?' · +'+fmt(hx)+' in':'');
   }
 
   document.getElementById('addForm').addEventListener('submit', function(e){
@@ -595,28 +603,33 @@ function __startLedger(){
   // ---- income modal (you + partner) ----
   var modal=document.getElementById('incomeModal');
   function refreshTotal(){
-    var y=+document.getElementById('mYou').value||0, p=+document.getElementById('mPartner').value||0;
-    document.getElementById('mTotal').textContent=fmt(y+p);
+    var y=+document.getElementById('mYou').value||0, p=+document.getElementById('mPartner').value||0, x=+document.getElementById('mExtra').value||0;
+    document.getElementById('mTotal').textContent=fmt(y+p+x);
   }
   function openModal(){
     var mk=monthKey(view);
     document.getElementById('mMonth').textContent=view.toLocaleString('en-ZA',{month:'short'}).toUpperCase()+' '+view.getFullYear();
     document.getElementById('mYou').value=youFor(mk);
     document.getElementById('mPartner').value=state.partner||0;
+    document.getElementById('mExtra').value=extraFor(mk)||'';
     refreshTotal(); modal.classList.add('open');
   }
   function closeModal(){ modal.classList.remove('open'); }
   document.getElementById('incomeCard').onclick=openModal;
   document.getElementById('mYou').oninput=refreshTotal;
   document.getElementById('mPartner').oninput=refreshTotal;
+  document.getElementById('mExtra').oninput=refreshTotal;
   document.getElementById('mCancel').onclick=closeModal;
   modal.addEventListener('click',function(e){ if(e.target===modal) closeModal(); });
   document.getElementById('mSave').onclick=function(){
     var mk=monthKey(view);
     var y=+document.getElementById('mYou').value, p=+document.getElementById('mPartner').value;
+    var x=+document.getElementById('mExtra').value;
     if(!state.you) state.you={};
+    if(!state.extra) state.extra={};
     if(!isNaN(y)) state.you[mk]=y;
     if(!isNaN(p)) state.partner=p;
+    state.extra[mk] = (!isNaN(x) && x>0) ? Math.round(x) : 0;
     save(); closeModal(); render();
   };
 
