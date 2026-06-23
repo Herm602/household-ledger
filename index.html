@@ -400,9 +400,9 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="chart.umd.js"></script>
+
+<script src="supabase.js"></script>
 <input type="file" id="importFile" accept="application/pdf" hidden />
 <script>
 function __startLedger(){
@@ -821,11 +821,17 @@ function __startLedger(){
   var SB_URL='https://bhkjtbfrppdicwlhfmbd.supabase.co';
   var SB_KEY='sb_publishable_ymQhxuUDeKjkIH_2uK-8bw_katrfbGJ';
   var KEY='ledger.v5';
-  var sb=window.supabase.createClient(SB_URL, SB_KEY);
   var gate=document.getElementById('authGate');
   var emailEl=document.getElementById('agEmail'), pwEl=document.getElementById('agPw'),
       btn=document.getElementById('agBtn'), msg=document.getElementById('agMsg'),
       toggle=document.getElementById('agToggle'), title=document.getElementById('agTitle');
+  gate.style.display='flex';
+  if(!window.supabase || !window.supabase.createClient){
+    if(msg) msg.textContent='Could not load the app — check your connection or pause any ad-blocker for this page, then reload.';
+    if(btn) btn.disabled=true;
+    return;
+  }
+  var sb=window.supabase.createClient(SB_URL, SB_KEY);
   var mode='login', booted=false, lastPush=0;
 
   function setMode(m){ mode=m;
