@@ -201,15 +201,18 @@
   /* hero */
   .hero{position:relative;border-radius:var(--r);overflow:hidden;margin-bottom:22px;min-height:344px;box-shadow:var(--shadow);border:1px solid rgba(255,255,255,.5);
     background:linear-gradient(150deg,#6E9BFF 0%,#3D6FE3 50%,#7A5CE6 100%)}
-  .heroImg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:0}
-  html[data-theme="light"] .heroImg{opacity:0}
-  .heroScrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(20,30,70,0) 0%,rgba(20,30,70,.12) 52%,rgba(15,22,55,.42) 100%)}
-  html[data-theme="dark"] .heroScrim{background:linear-gradient(180deg,rgba(6,8,12,.10) 0%,rgba(6,8,12,.30) 52%,rgba(6,8,12,.86) 100%)}
+  .heroImg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:0;transition:opacity .4s ease}
+  .heroDark{opacity:0}
+  html[data-theme="dark"] .heroLight{opacity:0}
+  html[data-theme="dark"] .heroDark{opacity:1}
+  .heroScrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(244,247,252,0) 30%,rgba(238,242,250,.55) 78%,rgba(232,238,248,.86) 100%)}
+  html[data-theme="dark"] .heroScrim{background:linear-gradient(180deg,rgba(6,8,12,.06) 0%,rgba(6,8,12,.34) 54%,rgba(6,8,12,.88) 100%)}
+  /* light theme: dark hero text on the airy glass image */
+  html[data-theme="light"] .heroIn .hk{color:rgba(28,44,86,.74)}
+  html[data-theme="light"] .heroIn .hv{color:#16223E;text-shadow:0 2px 22px rgba(255,255,255,.65)}
+  html[data-theme="light"] .heroIn .hsub{color:rgba(36,52,92,.82)}
+  html[data-theme="light"] .heroIn .hd{background:rgba(22,42,92,.10);color:#16223E}
   .heroIn{position:relative;z-index:2;padding:26px 28px;display:flex;flex-direction:column;justify-content:flex-end;min-height:344px}
-  .heroArt{position:absolute;top:14px;right:4px;width:140px;height:160px;z-index:1;pointer-events:none;animation:floatArt 7s ease-in-out infinite}
-  html[data-theme="dark"] .heroArt{display:none}
-  @keyframes floatArt{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-  @media(prefers-reduced-motion:reduce){.heroArt{animation:none}}
   .heroIn .hk{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:rgba(240,244,248,.72)}
   .heroIn .hv{font-family:"Barlow Condensed";font-weight:700;font-size:56px;line-height:.92;margin-top:6px;text-shadow:0 2px 26px rgba(0,0,0,.45)}
   .heroIn .hd{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;margin-top:10px;font-family:"JetBrains Mono";font-size:12.5px;padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.08);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -279,21 +282,9 @@
   <div id="toast" style="display:none;position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);color:var(--ink);padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:80;max-width:90vw"></div>
 
   <section class="hero screen" id="sec-overview" data-screen="home">
-    <img class="heroImg" src="hero.png" alt="" aria-hidden="true" />
+    <img class="heroImg heroLight" src="hero-light.png" alt="" aria-hidden="true" />
+    <img class="heroImg heroDark" src="hero-dark.png" alt="" aria-hidden="true" />
     <div class="heroScrim"></div>
-    <svg class="heroArt" viewBox="0 0 200 230" aria-hidden="true">
-      <ellipse cx="108" cy="202" rx="74" ry="15" fill="rgba(18,26,60,.30)"/>
-      <g transform="rotate(-15 105 110)">
-        <rect x="22" y="20" width="112" height="112" rx="30" fill="rgba(255,255,255,.13)" stroke="rgba(255,255,255,.42)" stroke-width="1"/>
-        <rect x="40" y="40" width="112" height="112" rx="30" fill="rgba(255,255,255,.18)" stroke="rgba(255,255,255,.55)" stroke-width="1"/>
-        <rect x="58" y="60" width="112" height="112" rx="30" fill="rgba(255,255,255,.30)" stroke="rgba(255,255,255,.78)" stroke-width="1.2"/>
-        <path d="M58 90 a30 30 0 0 1 30 -30 h52 a30 30 0 0 1 30 30 v4 h-112 z" fill="rgba(255,255,255,.22)"/>
-        <rect x="74" y="82" width="26" height="26" rx="8" fill="#FF8A7A"/>
-        <rect x="108" y="82" width="26" height="26" rx="8" fill="#7DD3A8"/>
-        <rect x="74" y="116" width="26" height="26" rx="8" fill="#7AA8FF"/>
-        <rect x="108" y="116" width="26" height="26" rx="8" fill="#FFCE6B"/>
-      </g>
-    </svg>
     <div class="heroIn">
       <div class="hk" id="heroLabel">Household · this month</div>
       <div class="hv num" id="heroVal">R0</div>
@@ -595,7 +586,8 @@ function __startLedger(){
     h.textContent=fmt(income);
     var hd=document.getElementById('heroDelta');
     hd.textContent=(remain<0?'▼ ':'▲ ')+fmt(Math.abs(remain))+(remain<0?' over':' left');
-    hd.style.color=remain<0?'#FFD2CE':'#DDEBFF';
+    var darkT=document.documentElement.getAttribute('data-theme')==='dark';
+    hd.style.color=remain<0 ? (darkT?'#FFD2CE':'#B23A2E') : (darkT?'#DDEBFF':'#1E5FC8');
     var hx=extraFor(mk);
     document.getElementById('heroSub').textContent='Hermann '+fmt(youFor(mk))+' · Liesl '+fmt(state.partner||0)+(hx>0?' · +'+fmt(hx)+' in':'');
   }
@@ -690,6 +682,7 @@ function __startLedger(){
   document.getElementById('themeBtn').onclick=function(){
     var r=document.documentElement; r.setAttribute('data-theme', r.getAttribute('data-theme')==='dark'?'light':'dark');
     localStorage.setItem('ledger.theme', r.getAttribute('data-theme'));
+    try{ render(); }catch(e){}
   };
   var savedTheme=localStorage.getItem('ledger.theme'); if(savedTheme) document.documentElement.setAttribute('data-theme',savedTheme);
 
