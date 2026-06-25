@@ -322,6 +322,7 @@
   <section class="panel screen" data-screen="shop" id="sec-shop">
     <div style="display:flex;gap:6px;margin-bottom:18px">
       <button class="segbtn on" id="segList" type="button">My list</button>
+      <button class="segbtn" id="segProducts" type="button">Products</button>
       <button class="segbtn" id="segSpecials" type="button">Specials <span id="segSpecialsN"></span></button>
     </div>
     <div id="shopListView">
@@ -337,6 +338,11 @@
         <button class="btn ghost" id="shopClear" type="button" style="flex:1">Clear ticked</button>
         <button class="btn" id="shopLog" type="button" style="flex:2">Log shop to Groceries</button>
       </div>
+    </div>
+    <div id="shopProductsView" style="display:none">
+      <h2>Products <small>tap to add</small></h2>
+      <input id="prodSearch" placeholder="Search products…" autocomplete="off" style="margin-bottom:14px" />
+      <div id="prodList"></div>
     </div>
     <div id="shopSpecialsView" style="display:none">
       <h2>Specials <small id="specSub"></small></h2>
@@ -965,7 +971,7 @@ function __startLedger(){
 
   function renderExtras(income, spent, mk){
     renderRunway(); renderPyf(income, mk); renderNetWorth();
-    renderBusiness(spent, mk); renderForecast(); renderEnvelopes(); renderShop(); renderSpecials();
+    renderBusiness(spent, mk); renderForecast(); renderEnvelopes(); renderShop(); renderSpecials(); renderProducts();
   }
 
   function renderShop(){
@@ -1056,15 +1062,62 @@ function __startLedger(){
     }).join('') : '<div class="empty">'+(sp.length?'No specials here.':'No specials loaded yet — they get refreshed weekly.')+'</div>';
   }
   function showShopView(which){
-    var listOn=which!=='specials';
-    var lv=document.getElementById('shopListView'), sv=document.getElementById('shopSpecialsView');
-    if(lv) lv.style.display=listOn?'':'none'; if(sv) sv.style.display=listOn?'none':'';
-    var sl=document.getElementById('segList'), ss=document.getElementById('segSpecials');
-    if(sl) sl.classList.toggle('on',listOn); if(ss) ss.classList.toggle('on',!listOn);
-    if(!listOn) renderSpecials();
+    var views={list:'shopListView', products:'shopProductsView', specials:'shopSpecialsView'};
+    var btns={list:'segList', products:'segProducts', specials:'segSpecials'};
+    Object.keys(views).forEach(function(k){
+      var v=document.getElementById(views[k]); if(v) v.style.display=(k===which)?'':'none';
+      var b=document.getElementById(btns[k]); if(b) b.classList.toggle('on',k===which);
+    });
+    if(which==='specials') renderSpecials();
+    if(which==='products') renderProducts();
   }
   var _sgl=document.getElementById('segList'); if(_sgl) _sgl.onclick=function(){ showShopView('list'); };
+  var _sgp=document.getElementById('segProducts'); if(_sgp) _sgp.onclick=function(){ showShopView('products'); };
   var _sgs=document.getElementById('segSpecials'); if(_sgs) _sgs.onclick=function(){ showShopView('specials'); };
+
+  // ---- product catalog (tap to add to list; shows live special price) ----
+  var CATALOG=[
+    ['Fresh produce',['Bananas','Apples','Avocados','Tomatoes','Onions','Potatoes','Carrots','Lettuce','Spinach','Mushrooms','Oranges','Lemons','Cucumber','Peppers','Butternut','Cabbage','Garlic','Bananas']],
+    ['Bakery',['White bread','Brown bread','Bread rolls','Wraps','Roti','Muffins','Rusks','Sourdough']],
+    ['Dairy & eggs',['Full cream milk','Low fat milk','Eggs','Butter','Margarine','Cheddar cheese','Gouda cheese','Cream cheese','Yoghurt','Maas','Custard','Fresh cream']],
+    ['Meat & poultry',['Chicken portions','Chicken braaipack','Beef mince','Boerewors','Steak','Bacon','Viennas','Russians','Lamb chops','Pork chops','Polony','Whole chicken']],
+    ['Frozen',['Frozen veg','Frozen chips','Ice cream','Frozen chicken','Fish fingers','Pizza','Frozen pies']],
+    ['Pantry',['Rice','Pasta','Maize meal','Cake flour','Sugar','Salt','Cooking oil','Mayonnaise','Tomato sauce','Baked beans','Tinned tomatoes','Peanut butter','Jam','Honey','Tea','Coffee','Cereal','Oats','Soup','Stock cubes','2-minute noodles']],
+    ['Snacks & sweets',['Chips','Biscuits','Chocolate','Sweets','Marshmallows','Nuts','Popcorn','Rusks']],
+    ['Drinks',['Coca-Cola','Soft drinks 2L','Fruit juice','Bottled water','Energy drink','Iced tea']],
+    ['Household',['Dishwashing liquid','Washing powder','Toilet paper','Paper towel','Bin bags','Cling wrap','Foil','Surface cleaner','Bleach','Dishwasher tablets']],
+    ['Toiletries',['Toothpaste','Soap','Shampoo','Deodorant','Body wash','Sanitary pads','Razors','Toilet paper']],
+    ['Baby',['Nappies','Baby wipes','Baby formula','Baby food']]
+  ];
+  var prodSearch='';
+  function specialFor(name){
+    var s=String(name).toLowerCase(); var best=null;
+    (state.specials||[]).forEach(function(x){ if(String(x.item).toLowerCase().indexOf(s)>=0){ if(!best||(+x.price)<(+best.price)) best=x; } });
+    return best;
+  }
+  function renderProducts(){
+    var el=document.getElementById('prodList'); if(!el) return;
+    var q=prodSearch.toLowerCase(), seen={};
+    el.innerHTML = CATALOG.map(function(cat){
+      var items=cat[1].filter(function(it){ var k=it.toLowerCase(); if(seen[k]) return false; seen[k]=1; return !q || k.indexOf(q)>=0; });
+      if(!items.length) return '';
+      return '<div style="margin-bottom:16px"><div style="font-family:\'JetBrains Mono\';font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:9px">'+esc(cat[0])+'</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:8px">'
+        + items.map(function(it){ var sp=specialFor(it);
+            return '<button class="prodpill" data-item="'+esc(it)+'"'+(sp?(' data-price="'+sp.price+'" data-shop="'+esc(sp.shop)+'"'):'')+' type="button" style="padding:8px 12px;border-radius:999px;border:1px solid '+(sp?'var(--ok)':'var(--line)')+';background:var(--surface2);color:var(--ink);font-size:12.5px;cursor:pointer">'+esc(it)+(sp?' <b style="color:var(--ok);font-family:\'JetBrains Mono\';font-size:11px;font-weight:500">'+fmt(sp.price)+'</b>':'')+'</button>';
+          }).join('')
+        +'</div></div>';
+    }).join('') || '<div class="empty">No products match.</div>';
+  }
+  var _prs=document.getElementById('prodSearch'); if(_prs) _prs.oninput=function(){ prodSearch=this.value; renderProducts(); };
+  var _prl=document.getElementById('prodList'); if(_prl) _prl.addEventListener('click', function(e){
+    var b=e.target.closest('.prodpill'); if(!b) return;
+    var name=b.getAttribute('data-item'), price=+b.getAttribute('data-price')||0, shop=b.getAttribute('data-shop');
+    if(!state.grocery) state.grocery=[];
+    state.grocery.push({ id:Date.now(), name:name, price:Math.round(price), done:false });
+    save(); renderShop();
+    toast('Added '+name+' to your list'+(price?(' · '+fmt(price)+(shop?' at '+shop:'')):'')+'.');
+  });
   var _ssrch=document.getElementById('specSearch'); if(_ssrch) _ssrch.oninput=function(){ specFilter=this.value; renderSpecials(); };
   var _splist=document.getElementById('specList'); if(_splist) _splist.addEventListener('click', function(e){
     var b=e.target.closest('.specadd'); if(!b) return;
