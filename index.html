@@ -275,6 +275,7 @@
         <button id="nextM" aria-label="Next month">›</button>
       </div>
       <button class="btn" id="importBtn" type="button" style="padding:9px 14px">⤓ Import statement</button>
+      <button class="iconbtn" id="exportBtn" aria-label="Export to Excel" title="Export to Excel">⤴</button>
       <button class="iconbtn" id="themeBtn" aria-label="Toggle theme">◐</button>
       <button class="iconbtn" id="logoutBtn" aria-label="Log out" title="Log out">⎋</button>
     </div>
@@ -860,6 +861,62 @@ function __startLedger(){
   }
   var _ib=document.getElementById('importBtn'); if(_ib) _ib.onclick=function(){ document.getElementById('importFile').click(); };
   var _if=document.getElementById('importFile'); if(_if) _if.onchange=function(e){ var f=e.target.files[0]; if(f) handleImport(f); e.target.value=''; };
+
+  // ---- export to Excel (multi-sheet SpreadsheetML, no library) ----
+  function xlsCell(v){
+    if(typeof v==='number' && isFinite(v)) return '<Cell><Data ss:Type="Number">'+v+'</Data></Cell>';
+    return '<Cell><Data ss:Type="String">'+esc(String(v==null?'':v))+'</Data></Cell>';
+  }
+  function xlsRow(cells){ return '<Row>'+cells.map(xlsCell).join('')+'</Row>'; }
+  function xlsSheet(name, rows){ return '<Worksheet ss:Name="'+esc(name).slice(0,31)+'"><Table>'+rows.map(xlsRow).join('')+'</Table></Worksheet>'; }
+  function buildWorkbook(){
+    var mks={}; state.tx.forEach(function(t){ mks[t.m]=1; }); var months=Object.keys(mks).sort();
+    // Sheet 1: Summary
+    var sum=[['Month','Income','Spent','Net','Savings %']];
+    months.forEach(function(mk){
+      var sp=state.tx.filter(function(t){return t.m===mk;}).reduce(function(s,t){return s+t.amt;},0);
+      var inc=incomeFor(mk); sum.push([mk, inc, sp, inc-sp, inc>0?Math.round((inc-sp)/inc*100):0]);
+    });
+    // Sheet 2: Transactions (expanded to line items)
+    var who={H:'Hermann',L:'Liesl'};
+    var tx=[['Month','Person','Category','Item','Amount']];
+    state.tx.slice().sort(function(a,b){return a.m<b.m?-1:a.m>b.m?1:0;}).forEach(function(t){
+      var p=who[t.who]||'';
+      if(t.detail && t.detail.length) t.detail.forEach(function(it){ tx.push([t.m,p,t.cat,it.d,Math.round(it.a)]); });
+      else tx.push([t.m,p,t.cat,(t.note||t.cat),Math.round(t.amt)]);
+    });
+    // Sheet 3: Budgets
+    var bud=[['Category','Monthly budget']];
+    CATS.forEach(function(c){ bud.push([c.name, budgetFor(c)]); });
+    // Sheet 4: Right now (balances, card, debts, net worth)
+    var ci=cardInfo(), b=state.balances||{};
+    var now=[['Item','Amount','Note']];
+    now.push(['Current account', b.current||0, 'available now']);
+    now.push(['Savings', b.savings||0, 'set aside']);
+    if(ci.limit) now.push(['Credit card available', ci.limit-ci.bal, 'of '+ci.limit+' limit · '+ci.bal+' owed']);
+    now.push(['','','']);
+    now.push(['Debt','Balance','Rate / payment']);
+    (state.debts||[]).forEach(function(d){ now.push([d.name, d.bal==null?'':d.bal, d.note||'']); });
+    now.push(['','','']);
+    now.push(['Net worth', netWorth(), 'home + cash − debts']);
+    now.push(['Home value', homeVal(), 'estimate']);
+    var xml='<?xml version="1.0"?>\n<?mso-application progid="Excel.Sheet"?>\n'
+      +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
+      + xlsSheet('Summary',sum) + xlsSheet('Transactions',tx) + xlsSheet('Budgets',bud) + xlsSheet('Right now',now)
+      + '</Workbook>';
+    return xml;
+  }
+  function exportExcel(){
+    try{
+      var xml=buildWorkbook();
+      var blob=new Blob([xml], {type:'application/vnd.ms-excel'});
+      var d=new Date(), stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Ledger-budget-'+stamp+'.xls';
+      document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      toast('Exported to Excel — check your downloads. ✓');
+    }catch(e){ toast('Export failed: '+(e.message||e)); }
+  }
+  var _eb=document.getElementById('exportBtn'); if(_eb) _eb.onclick=exportExcel;
 
   // ---- next-level: runway, pay-yourself-first, net worth, forecaster, envelopes, business ----
   var FIXED={'Bond':1,'Medical aid':1,'School & kids':1,'Life & policies':1,'Vehicle':1,'Security':1,'Internet':1};
