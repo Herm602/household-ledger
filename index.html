@@ -340,6 +340,7 @@
     </div>
     <div id="shopSpecialsView" style="display:none">
       <h2>Specials <small id="specSub"></small></h2>
+      <div id="specShops" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px"></div>
       <input id="specSearch" placeholder="Search specials…" autocomplete="off" style="margin-bottom:14px" />
       <div id="specList"></div>
     </div>
@@ -1017,32 +1018,42 @@ function __startLedger(){
   };
 
   // ---- specials (matched to the shopping list) ----
-  var specFilter='';
-  function shopMatch(item){
-    var list=state.grocery||[]; if(!list.length||!item) return false;
+  var specFilter='', specShop='All';
+  function matchWord(item){
+    var list=state.grocery||[]; if(!list.length||!item) return null;
     var s=String(item).toLowerCase();
-    return list.some(function(g){ var w=(g.name||'').toLowerCase().trim(); return w.length>2 && s.indexOf(w)>=0; });
+    for(var i=0;i<list.length;i++){ var w=(list[i].name||'').toLowerCase().trim(); if(w.length>2 && s.indexOf(w)>=0) return w; }
+    return null;
   }
+  function shopMatch(item){ return matchWord(item)!=null; }
   function renderSpecials(){
-    var el=document.getElementById('specList'); var sp=state.specials||[];
+    var sp=state.specials||[];
     var matches=sp.filter(function(x){return shopMatch(x.item);}).length;
     var n=document.getElementById('segSpecialsN'); if(n) n.textContent = matches? '· '+matches+' on list' : '';
-    if(!el) return;
-    var until=sp.length&&sp[0].until?sp[0].until:'';
-    var sub=document.getElementById('specSub'); if(sub) sub.textContent = sp.length ? (sp.length+' deals'+(until?' · to '+until:'')) : '';
+    var cheap={}; sp.forEach(function(x){ var w=matchWord(x.item); if(w!=null){ if(cheap[w]==null||(+x.price)<cheap[w]) cheap[w]=+x.price; } });
+    var shops=[]; sp.forEach(function(x){ if(x.shop && shops.indexOf(x.shop)<0) shops.push(x.shop); }); shops.sort();
+    var chipsEl=document.getElementById('specShops');
+    if(chipsEl){ chipsEl.innerHTML=['All'].concat(shops).map(function(s){
+      var on=specShop===s, cnt=s==='All'?sp.length:sp.filter(function(x){return x.shop===s;}).length;
+      return '<button class="specchip" data-shop="'+esc(s)+'" type="button" style="padding:6px 11px;border-radius:999px;border:1px solid '+(on?'transparent':'var(--line)')+';background:'+(on?'var(--accent)':'var(--surface2)')+';color:'+(on?'var(--on-accent)':'var(--muted)')+';font-size:11.5px;cursor:pointer">'+esc(s)+' '+cnt+'</button>';
+    }).join(''); }
+    var el=document.getElementById('specList'); if(!el) return;
+    var sub=document.getElementById('specSub'); if(sub) sub.textContent = sp.length ? (sp.length+' deals · '+shops.length+' shops') : '';
     var q=specFilter.toLowerCase();
-    var view=sp.filter(function(x){ return !q || String(x.item).toLowerCase().indexOf(q)>=0; }).slice();
-    view.sort(function(a,b){ var am=shopMatch(a.item), bm=shopMatch(b.item); if(am!==bm) return am?-1:1; return a.item<b.item?-1:1; });
-    el.innerHTML = view.length ? view.map(function(x){
-      var m=shopMatch(x.item);
+    var vw=sp.filter(function(x){ return (specShop==='All'||x.shop===specShop) && (!q || String(x.item).toLowerCase().indexOf(q)>=0); }).slice();
+    vw.sort(function(a,b){ var am=shopMatch(a.item), bm=shopMatch(b.item); if(am!==bm) return am?-1:1; return (+a.price)-(+b.price); });
+    el.innerHTML = vw.length ? vw.map(function(x){
+      var w=matchWord(x.item), m=w!=null, best=m && (+x.price)===cheap[w];
       return '<div style="display:flex;align-items:center;gap:11px;padding:12px 2px;border-bottom:1px solid var(--line)">'
         +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.item)+(m?' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-accent);background:var(--ok);border-radius:5px;padding:1px 6px">on list</span>':'')+'</div>'
-          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(x.shop||'')+(x.was?(' · was '+fmt(x.was)):'')+(x.until?'':'')+'</div>'
+          +'<div style="font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.item)
+            +(m?' <span style="font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--on-accent);background:var(--ok);border-radius:5px;padding:1px 6px">on list</span>':'')
+            +(best?' <span style="font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:#1E5FC8;border:1px solid #1E5FC8;border-radius:5px;padding:0 5px">cheapest</span>':'')+'</div>'
+          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(x.shop||'')+(x.until?(' · to '+esc(x.until)):'')+(x.was?(' · was '+fmt(x.was)):'')+'</div>'
         +'</div>'
         +'<div class="num" style="flex:none;font-family:\'Barlow Condensed\';font-weight:700;font-size:21px;color:var(--accent)">'+fmt(x.price)+'</div>'
         +'<button class="gbtn specadd" data-id="'+x.id+'" type="button" style="flex:none">+ list</button></div>';
-    }).join('') : '<div class="empty">'+(sp.length?'No specials match that search.':'No specials loaded yet — they get refreshed weekly.')+'</div>';
+    }).join('') : '<div class="empty">'+(sp.length?'No specials here.':'No specials loaded yet — they get refreshed weekly.')+'</div>';
   }
   function showShopView(which){
     var listOn=which!=='specials';
@@ -1062,6 +1073,9 @@ function __startLedger(){
     state.grocery.push({ id:Date.now(), name:String(x.item).slice(0,40), price:Math.round(x.price)||0, done:false });
     save(); renderShop(); renderSpecials();
     toast('Added to your list — '+(x.price?fmt(x.price):'')+'. ✓');
+  });
+  var _spchips=document.getElementById('specShops'); if(_spchips) _spchips.addEventListener('click', function(e){
+    var b=e.target.closest('.specchip'); if(!b) return; specShop=b.getAttribute('data-shop'); renderSpecials();
   });
 
   function renderRunway(){
