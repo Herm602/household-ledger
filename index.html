@@ -317,6 +317,21 @@
     </div>
   </section>
 
+  <section class="panel screen" data-screen="spending" id="sec-shop" style="margin-bottom:18px">
+    <h2>Shopping list <small id="shopSub"></small></h2>
+    <form id="shopAdd" style="display:flex;gap:8px;margin-bottom:6px">
+      <input id="shopName" placeholder="Item — e.g. Milk" autocomplete="off" style="flex:2;min-width:0" />
+      <input id="shopPrice" type="number" step="1" min="0" placeholder="R" class="num" style="flex:1;max-width:84px" />
+      <button class="btn" type="submit" style="flex:none;padding:11px 15px">Add</button>
+    </form>
+    <div id="shopList"></div>
+    <div id="shopTotals"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn ghost" id="shopClear" type="button" style="flex:1">Clear ticked</button>
+      <button class="btn" id="shopLog" type="button" style="flex:2">Log shop to Groceries</button>
+    </div>
+  </section>
+
   <section class="grid2 screen" id="sec-spending" data-screen="spending">
     <div class="panel">
       <h2>Where it goes <small>by category</small></h2>
@@ -496,6 +511,7 @@ function __startLedger(){
       assets: { home:0 },
       pyf: { save:2000, debt:2500 },
       envelopes: [ {id:1, name:'Tax provision (Levinn)', bal:0, target:20000}, {id:2, name:'Emergency fund', bal:0, target:30000}, {id:3, name:'Car service & tyres', bal:0, target:8000} ],
+      grocery: [],
       scenarios: { subs:false, medical:false, biz:false },
       goals: [ {id:1, name:'Emergency fund', target:30000, saved:0}, {id:2, name:'Clear Nedbank credit card', target:CARD_BAL, saved:0} ] };
   }
@@ -933,8 +949,57 @@ function __startLedger(){
 
   function renderExtras(income, spent, mk){
     renderRunway(); renderPyf(income, mk); renderNetWorth();
-    renderBusiness(spent, mk); renderForecast(); renderEnvelopes();
+    renderBusiness(spent, mk); renderForecast(); renderEnvelopes(); renderShop();
   }
+
+  function renderShop(){
+    var el=document.getElementById('shopList'); if(!el) return;
+    var list=state.grocery||[];
+    var ticked=list.filter(function(i){return i.done;});
+    var inCart=ticked.reduce(function(s,i){return s+(+i.price||0);},0);
+    var total=list.reduce(function(s,i){return s+(+i.price||0);},0);
+    var sub=document.getElementById('shopSub'); if(sub) sub.textContent=list.length?(ticked.length+' of '+list.length+' in cart'):'';
+    el.innerHTML = list.length ? list.map(function(i){
+      return '<div style="display:flex;align-items:center;gap:11px;padding:11px 2px;border-bottom:1px solid var(--line)">'
+        +'<button class="shopck" data-id="'+i.id+'" aria-label="toggle" style="width:24px;height:24px;border-radius:7px;border:1.5px solid '+(i.done?'var(--ok)':'var(--line)')+';background:'+(i.done?'var(--ok)':'transparent')+';color:#fff;flex:none;cursor:pointer;display:grid;place-items:center;font-size:13px">'+(i.done?'✓':'')+'</button>'
+        +'<div style="flex:1;min-width:0;'+(i.done?'opacity:.5;text-decoration:line-through':'')+'">'+esc(i.name)+'</div>'
+        +'<div class="num" style="flex:none;color:var(--muted)">'+(i.price?fmt(i.price):'')+'</div>'
+        +'<button class="shopdel" data-id="'+i.id+'" aria-label="remove" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;opacity:.5">✕</button></div>';
+    }).join('') : '<div class="empty">List is empty — add what you need above.</div>';
+    var tt=document.getElementById('shopTotals');
+    if(tt) tt.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:14px">'
+      +'<span style="font-size:12px;color:var(--muted);font-family:\'JetBrains Mono\';letter-spacing:.1em;text-transform:uppercase">In cart</span>'
+      +'<span class="num" style="font-family:\'Barlow Condensed\';font-weight:700;font-size:32px;color:var(--accent)">'+fmt(inCart)+'</span></div>'
+      +'<div style="font-size:11.5px;color:var(--muted)">List total '+fmt(total)+(state.budgets&&state.budgets.Groceries?(' · Groceries budget '+fmt(state.budgets.Groceries)+'/mo'):'')+'</div>';
+  }
+  var _sa=document.getElementById('shopAdd');
+  if(_sa) _sa.addEventListener('submit', function(e){ e.preventDefault();
+    var n=document.getElementById('shopName').value.trim(); if(!n) return;
+    var p=+document.getElementById('shopPrice').value||0;
+    if(!state.grocery) state.grocery=[];
+    state.grocery.push({ id:Date.now(), name:n.slice(0,40), price:Math.round(p), done:false });
+    document.getElementById('shopName').value=''; document.getElementById('shopPrice').value='';
+    save(); renderShop(); document.getElementById('shopName').focus();
+  });
+  var _sl=document.getElementById('shopList');
+  if(_sl) _sl.addEventListener('click', function(e){
+    var ck=e.target.closest('.shopck'), dl=e.target.closest('.shopdel');
+    if(ck){ var id=+ck.getAttribute('data-id'); var it=(state.grocery||[]).find(function(x){return x.id===id;}); if(it){ it.done=!it.done; save(); renderShop(); } return; }
+    if(dl){ var id2=+dl.getAttribute('data-id'); state.grocery=(state.grocery||[]).filter(function(x){return x.id!==id2;}); save(); renderShop(); }
+  });
+  var _sc=document.getElementById('shopClear');
+  if(_sc) _sc.onclick=function(){ if((state.grocery||[]).some(function(x){return x.done;})){ state.grocery=(state.grocery||[]).filter(function(x){return !x.done;}); save(); renderShop(); } };
+  var _slog=document.getElementById('shopLog');
+  if(_slog) _slog.onclick=function(){
+    var ticked=(state.grocery||[]).filter(function(i){return i.done;});
+    var total=ticked.reduce(function(s,i){return s+(+i.price||0);},0);
+    if(total<=0){ toast('Tick the items you bought (with prices) first.'); return; }
+    var mk=monthKey(view);
+    state.tx.push({ id:Date.now(), cat:'Groceries', amt:Math.round(total), note:'Grocery shop', m:mk, detail:ticked.map(function(i){return {d:i.name,a:Math.round(+i.price||0)};}) });
+    state.grocery=(state.grocery||[]).filter(function(x){return !x.done;});
+    save(); render();
+    toast('Logged '+fmt(total)+' to Groceries for '+view.toLocaleString('en-ZA',{month:'long'})+'. ✓');
+  };
 
   function renderRunway(){
     var el=document.getElementById('runway'); if(!el) return;
