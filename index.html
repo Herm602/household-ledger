@@ -352,6 +352,11 @@
     </div>
   </section>
 
+  <section class="panel screen" data-screen="spending" id="sec-who" style="margin-bottom:18px">
+    <h2>Who's spending <small>this month</small></h2>
+    <div id="whoSplit"></div>
+  </section>
+
   <section class="grid2 screen" id="sec-spending" data-screen="spending">
     <div class="panel">
       <h2>Where it goes <small>by category</small></h2>
@@ -375,6 +380,10 @@
         <div>
           <label class="fl">Category</label>
           <select id="fCat"></select>
+        </div>
+        <div>
+          <label class="fl">Who</label>
+          <select id="fWho"><option value="H">Hermann</option><option value="L">Liesl</option></select>
         </div>
         <div>
           <label class="fl">Amount (R)</label>
@@ -618,6 +627,37 @@ function __startLedger(){
     if(document.getElementById('scenarios')) renderPlan();
     renderHero(income, spent, remain, mk);
     renderExtras(income, spent, mk);
+    renderWho();
+  }
+  function renderWho(){
+    var el=document.getElementById('whoSplit'); if(!el) return;
+    var tx=txOfMonth();
+    var tot={H:0,L:0,O:0}, cats={};
+    tx.forEach(function(t){ var w=t.who==='H'?'H':(t.who==='L'?'L':'O'); tot[w]+=t.amt;
+      if(!cats[t.cat]) cats[t.cat]={H:0,L:0,O:0}; cats[t.cat][w]+=t.amt; });
+    var sum=tot.H+tot.L+tot.O||1;
+    var cards=[['Hermann',tot.H,'var(--accent)'],['Liesl',tot.L,'#9A6BD0']];
+    if(tot.O>0) cards.push(['Unassigned',tot.O,'var(--muted)']);
+    var rows=Object.keys(cats).map(function(c){ var o=cats[c]; return {c:c,H:o.H,L:o.L,O:o.O,t:o.H+o.L+o.O}; })
+      .filter(function(r){return r.t>0;}).sort(function(a,b){return b.t-a.t;});
+    el.innerHTML = '<div style="display:flex;gap:12px;margin-bottom:18px">'
+      + cards.map(function(x){ return '<div style="flex:1;background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:14px">'
+          +'<div style="font-family:\'JetBrains Mono\';font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">'+x[0]+'</div>'
+          +'<div class="num" style="font-family:\'Barlow Condensed\';font-weight:700;font-size:25px;margin-top:5px;color:'+x[2]+'">'+fmt(x[1])+'</div>'
+          +'<div style="font-size:11px;color:var(--muted);margin-top:3px">'+Math.round(x[1]/sum*100)+'% of spend</div></div>'; }).join('')
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;font-family:\'JetBrains Mono\';font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">By category'
+        +'<span style="display:inline-flex;align-items:center;gap:5px;margin-left:auto;text-transform:none;letter-spacing:0"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>Hermann</span>'
+        +'<span style="display:inline-flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0"><span style="width:9px;height:9px;border-radius:2px;background:#9A6BD0"></span>Liesl</span></div>'
+      + rows.map(function(r){
+          return '<div style="padding:9px 0;border-bottom:1px solid var(--line)">'
+            +'<div style="display:flex;justify-content:space-between;font-size:13px;gap:8px"><span>'+esc(r.c)+'</span>'
+              +'<span class="num" style="color:var(--muted);font-size:12px">'+(r.H?('H '+fmt(r.H)):'')+(r.H&&r.L?'  ':'')+(r.L?('L '+fmt(r.L)):'')+(r.O?('  •'+fmt(r.O)):'')+'</span></div>'
+            +'<div class="track" style="margin-top:6px;display:flex;overflow:hidden">'
+              +'<i style="width:'+(r.H/r.t*100)+'%;background:var(--accent)"></i>'
+              +'<i style="width:'+(r.L/r.t*100)+'%;background:#9A6BD0"></i>'
+              +'<i style="width:'+(r.O/r.t*100)+'%;background:var(--muted)"></i></div></div>';
+        }).join('');
   }
   function renderHero(income, spent, remain, mk){
     var h=document.getElementById('heroVal'); if(!h) return;
@@ -635,7 +675,7 @@ function __startLedger(){
     e.preventDefault();
     var amt = +document.getElementById('fAmt').value;
     if(!(amt>0)) return;
-    state.tx.push({ id:Date.now(), cat:sel.value, amt:amt, note:document.getElementById('fNote').value.trim(), m:monthKey(view) });
+    state.tx.push({ id:Date.now(), cat:sel.value, amt:amt, note:document.getElementById('fNote').value.trim(), m:monthKey(view), who:(document.getElementById('fWho')||{}).value||window.__ledgerWho||'H' });
     document.getElementById('fAmt').value=''; document.getElementById('fNote').value='';
     save(); render();
   });
@@ -1017,7 +1057,7 @@ function __startLedger(){
     var total=ticked.reduce(function(s,i){return s+(+i.price||0);},0);
     if(total<=0){ toast('Tick the items you bought (with prices) first.'); return; }
     var mk=monthKey(view);
-    state.tx.push({ id:Date.now(), cat:'Groceries', amt:Math.round(total), note:'Grocery shop', m:mk, detail:ticked.map(function(i){return {d:i.name,a:Math.round(+i.price||0)};}) });
+    state.tx.push({ id:Date.now(), cat:'Groceries', amt:Math.round(total), note:'Grocery shop', m:mk, who:window.__ledgerWho||'L', detail:ticked.map(function(i){return {d:i.name,a:Math.round(+i.price||0)};}) });
     state.grocery=(state.grocery||[]).filter(function(x){return !x.done;});
     save(); render();
     toast('Logged '+fmt(total)+' to Groceries for '+view.toLocaleString('en-ZA',{month:'long'})+'. ✓');
@@ -1268,6 +1308,7 @@ function __startLedger(){
   }
   tabbar.addEventListener('click', function(e){ var b=e.target.closest('button'); if(b) showScreen(b.getAttribute('data-screen')); });
 
+  var _fw0=document.getElementById('fWho'); if(_fw0 && window.__ledgerWho) _fw0.value=window.__ledgerWho;
   render(); renderGoals(); showScreen('home');
   try{ document.querySelector('.wrap').style.visibility='visible'; document.getElementById('tabbar').style.visibility='visible'; }catch(e){}
   window.__ledgerGet=function(){ return state; };
@@ -1352,6 +1393,7 @@ function __startLedger(){
     p.then(function(res){
       if(res.error){ msg.textContent=res.error.message; btn.disabled=false; return; }
       if(mode==='signup' && !res.data.session){ msg.style.color='#0E7C4A'; msg.textContent='Account created — now log in with the same details.'; setMode('login'); btn.disabled=false; return; }
+      window.__ledgerWho = /liesl/i.test(email) ? 'L' : 'H';
       boot();
     }).catch(function(e){ msg.textContent=String(e.message||e); btn.disabled=false; });
   }
@@ -1361,7 +1403,7 @@ function __startLedger(){
   window.__ledgerLogout=function(){ sb.auth.signOut().then(function(){ location.reload(); }); };
 
   sb.auth.getSession().then(function(r){
-    if(r.data && r.data.session){ boot(); }
+    if(r.data && r.data.session){ window.__ledgerWho = /liesl/i.test((r.data.session.user||{}).email||'') ? 'L' : 'H'; boot(); }
     else { gate.style.display='flex'; setMode('login'); }
   });
 })();
