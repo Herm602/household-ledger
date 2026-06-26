@@ -327,6 +327,7 @@
     </div>
     <div id="shopListView">
       <h2>Shopping list <small id="shopSub"></small></h2>
+      <div id="shopBudget"></div>
       <form id="shopAdd" style="display:flex;gap:8px;margin-bottom:6px">
         <input id="shopName" placeholder="Item — e.g. Milk" autocomplete="off" style="flex:2;min-width:0" />
         <input id="shopPrice" type="number" step="1" min="0" placeholder="R" class="num" style="flex:1;max-width:84px" />
@@ -978,9 +979,18 @@ function __startLedger(){
     now.push(['','','']);
     now.push(['Net worth', netWorth(), 'home + cash − debts']);
     now.push(['Home value', homeVal(), 'estimate']);
+    // Sheet 5: By person (Hermann vs Liesl)
+    function bucket(t){ return t.who==='H'?'H':(t.who==='L'?'L':'O'); }
+    var pp=[['By month','Hermann','Liesl','Unassigned']];
+    months.forEach(function(mk){ var o={H:0,L:0,O:0}; state.tx.forEach(function(t){ if(t.m===mk) o[bucket(t)]+=t.amt; });
+      pp.push([mk, Math.round(o.H), Math.round(o.L), Math.round(o.O)]); });
+    pp.push(['','','','']); pp.push(['By category','Hermann','Liesl','Unassigned']);
+    var cw={}; state.tx.forEach(function(t){ if(!cw[t.cat]) cw[t.cat]={H:0,L:0,O:0}; cw[t.cat][bucket(t)]+=t.amt; });
+    Object.keys(cw).sort(function(a,b){ var ta=cw[a].H+cw[a].L+cw[a].O, tb=cw[b].H+cw[b].L+cw[b].O; return tb-ta; })
+      .forEach(function(c){ var o=cw[c]; pp.push([c, Math.round(o.H), Math.round(o.L), Math.round(o.O)]); });
     var xml='<?xml version="1.0"?>\n<?mso-application progid="Excel.Sheet"?>\n'
       +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
-      + xlsSheet('Summary',sum) + xlsSheet('Transactions',tx) + xlsSheet('Budgets',bud) + xlsSheet('Right now',now)
+      + xlsSheet('Summary',sum) + xlsSheet('By person',pp) + xlsSheet('Transactions',tx) + xlsSheet('Budgets',bud) + xlsSheet('Right now',now)
       + '</Workbook>';
     return xml;
   }
@@ -1014,6 +1024,7 @@ function __startLedger(){
     renderBusiness(spent, mk); renderForecast(); renderEnvelopes(); renderShop(); renderSpecials(); renderProducts();
   }
 
+  function grocBudget(){ var c=CATS.find(function(x){return x.name==='Groceries';})||{name:'Groceries',budget:0}; return budgetFor(c); }
   function renderShop(){
     var el=document.getElementById('shopList'); if(!el) return;
     var list=state.grocery||[];
@@ -1021,6 +1032,14 @@ function __startLedger(){
     var inCart=ticked.reduce(function(s,i){return s+(+i.price||0);},0);
     var total=list.reduce(function(s,i){return s+(+i.price||0);},0);
     var sub=document.getElementById('shopSub'); if(sub) sub.textContent=list.length?(ticked.length+' of '+list.length+' in cart'):'';
+    var gBud=grocBudget();
+    var gSpent=txOfMonth().filter(function(t){return t.cat==='Groceries';}).reduce(function(s,t){return s+t.amt;},0);
+    var gLeft=gBud-gSpent, gpct=gBud>0?Math.min(100,Math.round(gSpent/gBud*100)):0, gOver=gSpent>gBud;
+    var bEl=document.getElementById('shopBudget');
+    if(bEl) bEl.innerHTML='<div style="background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:16px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-family:\'JetBrains Mono\';font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Groceries budget · '+view.toLocaleString('en-ZA',{month:'short'}).toUpperCase()+'</div><button class="gbtn" id="grocBudEdit" type="button">Set</button></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px"><div class="num" style="font-family:\'Barlow Condensed\';font-weight:700;font-size:25px;color:'+(gLeft<0?'var(--danger)':'var(--ok)')+'">'+fmt(Math.abs(gLeft))+(gLeft<0?' over':' left')+'</div><div style="font-size:12px;color:var(--muted)">'+fmt(gSpent)+' of '+fmt(gBud)+'</div></div>'
+      +'<div class="track" style="margin-top:9px"><div class="fill" style="width:'+gpct+'%;background:'+(gOver?'var(--danger)':'var(--ok)')+'"></div></div></div>';
     el.innerHTML = list.length ? list.map(function(i){
       return '<div style="display:flex;align-items:center;gap:11px;padding:11px 2px;border-bottom:1px solid var(--line)">'
         +'<button class="shopck" data-id="'+i.id+'" aria-label="toggle" style="width:24px;height:24px;border-radius:7px;border:1.5px solid '+(i.done?'var(--ok)':'var(--line)')+';background:'+(i.done?'var(--ok)':'transparent')+';color:#fff;flex:none;cursor:pointer;display:grid;place-items:center;font-size:13px">'+(i.done?'✓':'')+'</button>'
@@ -1032,7 +1051,8 @@ function __startLedger(){
     if(tt) tt.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:14px">'
       +'<span style="font-size:12px;color:var(--muted);font-family:\'JetBrains Mono\';letter-spacing:.1em;text-transform:uppercase">In cart</span>'
       +'<span class="num" style="font-family:\'Barlow Condensed\';font-weight:700;font-size:32px;color:var(--accent)">'+fmt(inCart)+'</span></div>'
-      +'<div style="font-size:11.5px;color:var(--muted)">List total '+fmt(total)+(state.budgets&&state.budgets.Groceries?(' · Groceries budget '+fmt(state.budgets.Groceries)+'/mo'):'')+'</div>';
+      +'<div style="font-size:11.5px;color:var(--muted)">List total '+fmt(total)+'</div>'
+      +(inCart>0?('<div style="font-size:12px;margin-top:4px;color:'+((gLeft-inCart)<0?'var(--danger)':'var(--muted)')+'">After logging this cart: '+fmt(Math.abs(gLeft-inCart))+(((gLeft-inCart)<0)?' over budget':' left this month')+'</div>'):'');
   }
   var _sa=document.getElementById('shopAdd');
   if(_sa) _sa.addEventListener('submit', function(e){ e.preventDefault();
@@ -1062,6 +1082,11 @@ function __startLedger(){
     save(); render();
     toast('Logged '+fmt(total)+' to Groceries for '+view.toLocaleString('en-ZA',{month:'long'})+'. ✓');
   };
+  var _gbe=document.getElementById('shopBudget'); if(_gbe) _gbe.addEventListener('click', function(e){
+    if(e.target.id!=='grocBudEdit') return;
+    var v=prompt('Monthly grocery budget (R):', grocBudget());
+    if(v!==null && v!=='' && !isNaN(+v)){ if(!state.budgets) state.budgets={}; state.budgets.Groceries=Math.round(+v); save(); render(); }
+  });
 
   // ---- specials (matched to the shopping list) ----
   var specFilter='', specShop='All';
